@@ -27,6 +27,14 @@ _DEFAULTS = dict(
     log_api_token="",
     log_file="",
     log_services="",
+    # 持久化（json / mysql 双模式）
+    persistence_mode="json",
+    persistence_path="spell_state.json",
+    mysql_host="127.0.0.1",
+    mysql_port="3306",
+    mysql_user="root",
+    mysql_password="",
+    mysql_database="spell_log",
 )
 
 
@@ -43,6 +51,15 @@ class Settings:
     log_file: str = _DEFAULTS["log_file"]
     # 显式指定的服务单元列表（serviceUinitId），逗号分隔；空=依赖服务发现
     log_services: str = _DEFAULTS["log_services"]
+    # 持久化模式：json / mysql
+    persistence_mode: str = _DEFAULTS["persistence_mode"]
+    persistence_path: str = _DEFAULTS["persistence_path"]
+    # mysql 连接参数
+    mysql_host: str = _DEFAULTS["mysql_host"]
+    mysql_port: str = _DEFAULTS["mysql_port"]
+    mysql_user: str = _DEFAULTS["mysql_user"]
+    mysql_password: str = _DEFAULTS["mysql_password"]
+    mysql_database: str = _DEFAULTS["mysql_database"]
 
     def services_list(self) -> Optional[List[str]]:
         s = self.log_services.strip()
@@ -67,6 +84,16 @@ def _load_yaml(path: str) -> dict:
         norm["log_api_token"] = ds.get("api_token", data.get("log_api_token", ""))
         norm["log_file"] = ds.get("file", data.get("log_file", ""))
         norm["log_services"] = ds.get("services", data.get("log_services", ""))
+    # 持久化段
+    ps = data.get("persistence", {}) if isinstance(data.get("persistence"), dict) else {}
+    norm["persistence_mode"] = ps.get("mode", data.get("persistence_mode", ""))
+    norm["persistence_path"] = ps.get("path", data.get("persistence_path", ""))
+    mq = ps.get("mysql", {}) if isinstance(ps.get("mysql"), dict) else {}
+    norm["mysql_host"] = mq.get("host", data.get("mysql_host", ""))
+    norm["mysql_port"] = mq.get("port", data.get("mysql_port", ""))
+    norm["mysql_user"] = mq.get("user", data.get("mysql_user", ""))
+    norm["mysql_password"] = mq.get("password", data.get("mysql_password", ""))
+    norm["mysql_database"] = mq.get("database", data.get("mysql_database", ""))
     # 去掉空串，保留非空
     return {k: v for k, v in norm.items() if v not in (None, "")}
 
@@ -95,6 +122,13 @@ def load_settings(config_path: Optional[str] = None) -> Settings:
         log_api_token=pick("LOG_API_TOKEN", "log_api_token"),
         log_file=pick("LOG_FILE", "log_file"),
         log_services=pick("LOG_SERVICES", "log_services"),
+        persistence_mode=pick("PERSISTENCE_MODE", "persistence_mode"),
+        persistence_path=pick("PERSISTENCE_PATH", "persistence_path"),
+        mysql_host=pick("MYSQL_HOST", "mysql_host"),
+        mysql_port=pick("MYSQL_PORT", "mysql_port"),
+        mysql_user=pick("MYSQL_USER", "mysql_user"),
+        mysql_password=pick("MYSQL_PASSWORD", "mysql_password"),
+        mysql_database=pick("MYSQL_DATABASE", "mysql_database"),
     )
 
 

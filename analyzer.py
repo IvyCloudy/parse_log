@@ -16,6 +16,8 @@ from typing import Dict, List, Optional
 
 from spell_parser import Spell, LCSObject
 from data_sources import LogDataSource, log_date_to_ms
+from store import build_store
+from config import settings
 
 
 # 错误类型分类规则：按关键字优先级匹配模板内容。
@@ -129,7 +131,9 @@ class LogAnalyzer:
     def analyze(self, services: Optional[List[str]] = None,
                 start_ms: int = 1787278400000, end_ms: int = 1787282000000,
                 batch_size: int = 50, by_dim: Optional[str] = None,
-                allow_out_of_order: bool = False) -> dict:
+                allow_out_of_order: bool = False,
+                persist_path: Optional[str] = None, persist_mode: str = "json",
+                **store_kwargs) -> dict:
         """按 (服务单元, 时间窗) 分批查询并增量解析，返回本次分析概览。
 
         保护机制（防误用）：
@@ -258,7 +262,7 @@ class LogAnalyzer:
                     "sample": rec["sample"],
                 })
 
-            return {
+            result = {
                 "services": services,
                 "newly_processed": processed,
                 "total_processed": self.spell.total_processed,
@@ -266,6 +270,20 @@ class LogAnalyzer:
                 "message_types": len(pattern_list),
                 "patterns": pattern_list,
             }
+
+            # 可选：本次 analyze 结果落库（json 模式同时刷新模板库文件）
+            if persist_path or persist_mode:
+                path = persist_path or settings.persistence_path or "spell_state.json"
+                mode = persist_mode or settings.persistence_mode or "json"
+                if mode == "json":
+                    self.save(path, mode="json")
+                self.persist_analyze(
+                    result, path=path, mode=mode,
+                    by_dim=by_dim, start_ms=start_ms, end_ms=end_ms,
+                    **store_kwargs,
+                )
+
+            return result
         finally:
             self._feed_owner = None
             self._feed_lock.release()
@@ -310,26 +328,52 @@ class LogAnalyzer:
 
     # -- 持久化 ------------------------------------------------------------
 
-    def save(self, path: str) -> None:
-        self.spell.save(path)
-        # 维度分桶单独持久化，文件名加 .dim 后缀
-        import json as _json
-        dim_path = path + ".dim"
-        with open(dim_path, "w", encoding="utf-8") as f:
-            _json.dump(
-                {k: v.to_dict() for k, v in self._by_dim.items()},
-                f, ensure_ascii=False, indent=2,
-            )
+    def _store_for(self, mode: Optional[str], path: Optional[str], **store_kwargs):
+        """按 mode/path 构造后端；未指定时回退到模块级 settings（config.yaml）。"""
+        if mode is None:
+            mode = settings.persistence_mode or "json"
+        if path is None:
+            path = settings.persistence_path or "spell_state.json"
+        return build_store(mode=mode, path=path, **store_kwargs)
 
-    def load(self, path: str) -> None:
-        self.spell = Spell.load(path)
-        import json as _json
-        dim_path = path + ".dim"
-        self._by_dim = {}
+    def save(self, path: Optional[str] = None, mode: Optional[str] = None,
+             **store_kwargs) -> None:
+        """把内存态（全局 spell + 维度分桶）持久化。
+
+        mode/path 为 None 时从 config.yaml 的 persistence 段读取（默认 json）。
+          - "json"  : 写入 JSON 文件（path 为全局文件，维度分桶写到 path+".dim"）。
+          - "mysql" : 写入 MySQL（连接参数取 settings 的 mysql_* 字段）。
+        """
+        store = self._store_for(mode, path, **store_kwargs)
         try:
-            with open(dim_path, "r", encoding="utf-8") as f:
-                raw = _json.load(f)
-            for k, d in raw.items():
-                self._by_dim[k] = _rebuild_spell(d, self.spell.tau)
-        except FileNotFoundError:
-            pass
+            store.save_analyzer(self)
+        finally:
+            store.close()
+
+    def load(self, path: Optional[str] = None, mode: Optional[str] = None,
+             **store_kwargs) -> None:
+        """从持久化恢复内存态，覆盖 self.spell 与 self._by_dim。
+
+        见 save() 的 mode 说明。
+        """
+        store = self._store_for(mode, path, **store_kwargs)
+        try:
+            store.load_analyzer(self)
+        finally:
+            store.close()
+
+    def persist_analyze(self, result: dict, path: Optional[str] = None,
+                        mode: Optional[str] = None, by_dim: Optional[str] = None,
+                        start_ms: Optional[int] = None, end_ms: Optional[int] = None,
+                        **store_kwargs) -> int:
+        """把一次 analyze 返回结果落库，返回 run_id。
+
+        mode/path 为 None 时回退到配置。json 写 path+".runs.json"，mysql 写表。
+        """
+        store = self._store_for(mode, path, **store_kwargs)
+        try:
+            return store.save_analyze_result(
+                self, result, by_dim=by_dim, start_ms=start_ms, end_ms=end_ms
+            )
+        finally:
+            store.close()

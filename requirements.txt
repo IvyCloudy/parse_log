@@ -1,5 +1,14 @@
+# --- Web 服务（HTTP 接口 / --serve 模式）---
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.0
+
+# --- 数据源（HTTP 拉取 / mock）---
 requests>=2.31
+
+# --- 配置 ---
 pyyaml>=6.0
+
+# --- 持久化（mysql 模式 / --migrate）：仅 mysql 模式需要 ---
+# json 模式无需安装；mysql 模式需 pip install pymysql
+pymysql>=1.1

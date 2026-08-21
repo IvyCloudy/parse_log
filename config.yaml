@@ -21,3 +21,20 @@ data_source:
 # 解析器参数（可选，预留扩展）
 parser:
   tau: 0.5
+
+# 持久化配置（问题：支持 json 文件 / mysql 两种模式）
+#   mode: json | mysql
+#     - json  : 写入 path 指定的文件（维度分桶写 path+".dim"，analyze 结果写 path+".runs.json"）
+#     - mysql : 写入 MySQL（见 migrations/001_init_schema.sql），凭据取 mysql 子段
+#   环境变量覆盖（优先级高于本文件）：
+#     PERSISTENCE_MODE / PERSISTENCE_PATH /
+#     MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE
+persistence:
+  mode: json
+  path: "spell_state.json"
+  mysql:
+    host: "127.0.0.1"
+    port: 3306
+    user: "root"
+    password: ""
+    database: "spell_log"

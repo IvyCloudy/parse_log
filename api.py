@@ -53,6 +53,16 @@ analyzer = LogAnalyzer(
 _feed_locks: dict = {}
 _feed_locks_guard = threading.Lock()
 
+# 启动即从配置化的持久化恢复内存态（mysql/json 皆可），保证服务重启后模板库不丢。
+try:
+    analyzer.load(path=None, mode=None)  # mode/path=None -> 从 settings 读取
+    logger.info(
+        "已恢复模板库 (mode=%s, path=%s)",
+        settings.persistence_mode, settings.persistence_path,
+    )
+except Exception as e:  # noqa: BLE001
+    logger.warning("启动时恢复模板库失败（冷启动）: %s", e)
+
 
 def _lock_for(services) -> threading.Lock:
     key = ",".join(sorted(services)) if services else "*"
@@ -95,6 +105,7 @@ def analyze(req: AnalyzeRequest):
             end_ms=req.end,
             batch_size=req.batch_size,
             allow_out_of_order=req.allow_out_of_order,
+            persist_mode=settings.persistence_mode,  # 按配置落库（json/mysql）
         )
     except (ConcurrentFeedError, OutOfOrderFeedError) as e:
         # 并行/乱序属于「误用」而非服务内部错误，用 409 表达更贴切
@@ -158,14 +169,24 @@ def reset():
 
 
 @app.post("/save", response_model=MessageResponse)
-def save_model(path: str = Query("spell_model.json")):
-    """持久化模板库到 JSON。"""
-    analyzer.save(path)
-    return MessageResponse(message=f"saved to {path}")
+def save_model(
+    path: Optional[str] = Query(None, description="持久化路径/标识；缺省读 config.yaml"),
+    mode: Optional[str] = Query(None, description="json | mysql；缺省读 config.yaml"),
+):
+    """持久化模板库。模式由 config.yaml 的 persistence.mode 决定（可被参数覆盖）。"""
+    analyzer.save(path, mode=mode)
+    return MessageResponse(
+        message=f"saved (mode={mode or settings.persistence_mode}, path={path or settings.persistence_path})"
+    )
 
 
 @app.post("/load", response_model=MessageResponse)
-def load_model(path: str = Query("spell_model.json")):
-    """从 JSON 恢复模板库。"""
-    analyzer.load(path)
-    return MessageResponse(message=f"loaded from {path}")
+def load_model(
+    path: Optional[str] = Query(None, description="持久化路径/标识；缺省读 config.yaml"),
+    mode: Optional[str] = Query(None, description="json | mysql；缺省读 config.yaml"),
+):
+    """从持久化恢复模板库。模式由 config.yaml 决定。"""
+    analyzer.load(path, mode=mode)
+    return MessageResponse(
+        message=f"loaded (mode={mode or settings.persistence_mode}, path={path or settings.persistence_path})"
+    )
