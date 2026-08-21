@@ -1,0 +1,23 @@
+# Spell 日志分析服务 — 配置文件
+#
+# 说明：
+#   - 本文件可被环境变量覆盖，优先级：环境变量 > 本文件 > 默认值
+#   - 路径可用环境变量 CONFIG_FILE 指定（默认：项目根 config.yaml）
+#   - 兼容历史环境变量名：LOG_SOURCE / LOG_API_URL / LOG_API_TOKEN / LOG_FILE / LOG_SERVICES
+#
+# 数据源类型：mock（仅演示） / file（本地文件） / http（真实接口）
+log_source: file
+
+# 数据源详细配置
+data_source:
+  # http 模式：对接真实日志查询接口
+  api_url: "https://your-api/errors"
+  api_token: ""            # 可选，注入 Authorization: Bearer
+  # file 模式：本地 JSONL 日志文件（每行一条 logData）
+  file: "demo/test_logs.jsonl"
+  # 显式指定服务单元列表（serviceUinitId，逗号分隔）；留空则依赖服务发现
+  services: ""
+
+# 解析器参数（可选，预留扩展）
+parser:
+  tau: 0.5

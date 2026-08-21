@@ -1,0 +1,21 @@
+{
+  "code": 0,
+  "data": {
+    "endTime": 1787278500000,
+    "startTime": 1787278400000,
+    "logNums": 1000000,
+    "logDatas": [
+      {
+        "logType": "APP",
+        "level": "ERROR",
+        "message": "test error",
+        "logDate": "2026-06-15T10:00:00.0000000+0800",
+        "traceId": "1234567890",
+        "method": "com.example.demo.DemoApplication.main(xxx.java:10)",
+        "logger": "com.example.demo.DemoApplication",
+        "appName": "test-app",
+        "serviceUinitId": "test-unit-1"
+      }
+    ]
+  }
+}

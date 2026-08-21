@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+venv/
+.venv/
+
+# 运行时产物（解析模型/维度分桶，按需持久化但一般不上传）
+spell_model.json
+spell_model.json.dim
+
+# 编辑器/IDE
+.idea/
+.vscode/
+.DS_Store
